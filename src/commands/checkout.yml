@@ -1,0 +1,6 @@
+description: >
+  SSH-less checkout
+steps:
+  - run:
+      name: Checkout
+      command: <<include(scripts/checkout.sh)>>

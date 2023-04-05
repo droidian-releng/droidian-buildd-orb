@@ -2,6 +2,23 @@
 
 AVAILABLE_ARCHITECTURES="amd64 arm64 armhf"
 
+# Determine branch. On tag builds, CIRCLE_BRANCH is not set, so we infer
+# the branch by looking at the actual tag
+if [ -n "${CIRCLE_TAG}" ]; then
+    REAL_BRANCH="$(echo ${CIRCLE_TAG} | cut -d "/" -f2)"
+else
+    REAL_BRANCH="${CIRCLE_BRANCH}"
+fi
+
+# Is this an official build?
+if \
+    [ "${CIRCLE_PROJECT_USERNAME}" == "droidian" ] || \
+    [ "${CIRCLE_PROJECT_USERNAME}" == "droidian-releng" ] || \
+    [ "${CIRCLE_PROJECT_USERNAME}" == "droidian-devices" ]
+then
+    OFFICIAL_BUILD="yes"
+fi
+
 cat > generated_config.yml <<EOF
 version: 2.1
 
@@ -62,12 +79,18 @@ commands:
           name: <<parameters.architecture>> build
           command: |
             mkdir -p /tmp/buildd-results ; \\
-            git clone -b "$CIRCLE_BRANCH" "${CIRCLE_REPOSITORY_URL//git@github.com:/https:\/\/github.com\/}" sources ; \\
+            git clone -b "${REAL_BRANCH}" "${CIRCLE_REPOSITORY_URL//git@github.com:/https:\/\/github.com\/}" sources ; \\
+            if [ -n "${CIRCLE_TAG}" ]; then \\
+              cd sources ; \\
+              git fetch --tags ; \\
+              git checkout "${CIRCLE_TAG}" ; \\
+              cd .. ; \\
+            fi ; \\
             docker run \\
               --rm \\
               -e CI \\
               -e CIRCLECI \\
-              -e CIRCLE_BRANCH \\
+              -e CIRCLE_BRANCH="${REAL_BRANCH}" \\
               -e CIRCLE_SHA1 \\
               -e CIRCLE_TAG \\
               -e EXTRA_REPOS="<<parameters.extra_repos>>" \\
@@ -75,8 +98,14 @@ commands:
               -e RELENG_HOST_ARCH="<<parameters.host_arch>>" \\
               -v /tmp/buildd-results:/buildd \\
               -v ${PWD}/sources:/buildd/sources \\
+              --security-opt seccomp=unconfined \\
               quay.io/droidian/build-essential:<<parameters.suite>>-<<parameters.architecture>> \\
               /bin/sh -c "cd /buildd/sources ; releng-build-package"
+
+  deploy-offline:
+    steps:
+      - store_artifacts:
+          path: /tmp/buildd-results
 
   deploy:
     parameters:
@@ -94,7 +123,7 @@ commands:
               --rm \\
               -e CI \\
               -e CIRCLECI \\
-              -e CIRCLE_BRANCH \\
+              -e CIRCLE_BRANCH="${REAL_BRANCH}" \\
               -e CIRCLE_SHA1 \\
               -e CIRCLE_PROJECT_USERNAME \\
               -e CIRCLE_PROJECT_REPONAME \\
@@ -111,7 +140,7 @@ jobs:
 EOF
 
 # Determine which architectures to build
-ARCHITECTURES="$(grep 'Architecture:' debian/control | awk '{ print $2 }' | sort -u | grep -v all)" || true
+ARCHITECTURES="$(grep 'Architecture:' debian/control | cut -d ' ' -f2- | sed -s 's| |\n|g' | sort -u | grep -v all)" || true
 if echo "${ARCHITECTURES}" | grep -q "any"; then
     ARCHITECTURES="${AVAILABLE_ARCHITECTURES}"
 elif [ -z "${ARCHITECTURES}" ]; then
@@ -133,10 +162,17 @@ fi
 EXTRA_REPOS="$(grep 'XS-Droidian-Extra-Repos:' debian/control | cut -d ' ' -f2-)" || true
 
 # Determine suite
-SUITE="$(echo ${CIRCLE_BRANCH} | cut -d/ -f2)"
+SUITE="$(echo ${REAL_BRANCH} | cut -d/ -f2)"
 
 full_build="yes"
+enabled_architectures=""
 for arch in ${ARCHITECTURES}; do
+    if ! echo "${AVAILABLE_ARCHITECTURES}" | grep -q ${arch}; then
+        continue
+    else
+        enabled_architectures="${enabled_architectures} ${arch}"
+    fi
+
     if [ "${arch}" == "amd64" ]; then
         resource_class="medium"
     else
@@ -162,10 +198,21 @@ for arch in ${ARCHITECTURES}; do
           full_build: "${full_build}"
           host_arch: "${HOST_ARCH}"
           extra_repos: "${EXTRA_REPOS}"
+EOF
+
+    if [ "${OFFICIAL_BUILD}" == "yes" ]; then
+        cat >> generated_config.yml <<EOF
       - deploy:
           suite: "${SUITE}"
           architecture: "${arch}"
+
 EOF
+    else
+        cat >> generated_config.yml <<EOF
+      - deploy-offline
+
+EOF
+    fi
 
     full_build="no"
 done
@@ -176,9 +223,12 @@ workflows:
     jobs:
 EOF
 
-for arch in ${ARCHITECTURES}; do
+for arch in ${enabled_architectures}; do
     cat >> generated_config.yml <<EOF
       - build-${arch}:
+          filters:
+            tags:
+              only: /^droidian\/.*\/.*/
           context:
             - droidian-buildd
 EOF
