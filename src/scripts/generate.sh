@@ -2,6 +2,8 @@
 
 AVAILABLE_ARCHITECTURES="amd64 arm64 armhf"
 
+DEFAULT_SUITE="trixie"
+
 # Determine branch. On tag builds, CIRCLE_BRANCH is not set, so we infer
 # the branch by looking at the actual tag
 if [ -n "${CIRCLE_TAG}" ]; then
@@ -162,7 +164,12 @@ fi
 EXTRA_REPOS="$(grep 'XS-Droidian-Extra-Repos:' debian/control | cut -d ' ' -f2-)" || true
 
 # Determine suite
-SUITE="$(echo ${REAL_BRANCH} | cut -d/ -f2)"
+# If the branch name is droidian, use $DEFAULT_SUITE
+if [ "${REAL_BRANCH}" == "droidian" ]; then
+    SUITE="${DEFAULT_SUITE}"
+else
+    SUITE="$(echo ${REAL_BRANCH} | cut -d/ -f2)"
+fi
 
 full_build="yes"
 enabled_architectures=""
