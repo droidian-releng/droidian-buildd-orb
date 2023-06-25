@@ -8,6 +8,14 @@ DEFAULT_SUITE="trixie"
 # the branch by looking at the actual tag
 if [ -n "${CIRCLE_TAG}" ]; then
     REAL_BRANCH="$(echo ${CIRCLE_TAG} | cut -d "/" -f2)"
+
+    if \
+        [ "${REAL_BRANCH}" == "${DEFAULT_SUITE}" ] && \
+        ! git ls-remote --exit-code --heads origin refs/heads/${REAL_BRANCH} &>/dev/null
+    then
+        # "rolling" release, set REAL_BRANCH to droidian.
+        REAL_BRANCH="droidian"
+    fi
 else
     REAL_BRANCH="${CIRCLE_BRANCH}"
 fi
