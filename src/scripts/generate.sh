@@ -108,6 +108,8 @@ commands:
               -e RELENG_HOST_ARCH="<<parameters.host_arch>>" \\
               -v /tmp/buildd-results:/buildd \\
               -v ${PWD}/sources:/buildd/sources \\
+              --cap-add=SYS_ADMIN \\
+              --security-opt apparmor:unconfined \\
               --security-opt seccomp=unconfined \\
               quay.io/droidian/build-essential:<<parameters.suite>>-<<parameters.architecture>> \\
               /bin/sh -c "cd /buildd/sources ; releng-build-package"
