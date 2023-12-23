@@ -87,6 +87,7 @@ commands:
     steps:
       - run:
           name: <<parameters.architecture>> build
+          no_output_timeout: 20m
           command: |
             mkdir -p /tmp/buildd-results ; \\
             git clone -b "${REAL_BRANCH}" "${CIRCLE_REPOSITORY_URL//git@github.com:/https:\/\/github.com\/}" sources ; \\
