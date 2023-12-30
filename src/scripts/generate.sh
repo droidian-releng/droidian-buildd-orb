@@ -152,6 +152,9 @@ commands:
 jobs:
 EOF
 
+# Get source package name
+SOURCE_NAME="$(grep 'Source:' debian/control | cut -d ' ' -f2-)"
+
 # Determine which architectures to build
 ARCHITECTURES="$(grep 'Architecture:' debian/control | cut -d ' ' -f2- | sed -s 's| |\n|g' | sort -u | grep -v all)" || true
 if echo "${ARCHITECTURES}" | grep -q "any"; then
@@ -191,7 +194,9 @@ for arch in ${ARCHITECTURES}; do
         enabled_architectures="${enabled_architectures} ${arch}"
     fi
 
-    if [ "${arch}" == "amd64" ]; then
+    if [[ "${SOURCE_NAME}" == linux-android-* ]] && [ "${arch}" == "amd64" ]; then
+        resource_class="large"
+    elif [ "${arch}" == "amd64" ]; then
         resource_class="medium"
     else
         resource_class="arm.medium"
