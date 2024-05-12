@@ -2,7 +2,7 @@
 
 AVAILABLE_ARCHITECTURES="amd64 arm64 armhf"
 
-DEFAULT_SUITE="trixie"
+DEFAULT_SUITE="next"
 
 # Determine branch. On tag builds, CIRCLE_BRANCH is not set, so we infer
 # the branch by looking at the actual tag
