@@ -10,7 +10,7 @@ if [ -n "${CIRCLE_TAG}" ]; then
     REAL_BRANCH="$(echo ${CIRCLE_TAG} | cut -d "/" -f2)"
 
     if \
-        [ "${REAL_BRANCH}" == "${DEFAULT_SUITE}" ] && \
+        ([ "${REAL_BRANCH}" == "trixie" ] || [ "${REAL_BRANCH}" == "${DEFAULT_SUITE}" ]) && \
         ! git ls-remote --exit-code --heads origin refs/heads/${REAL_BRANCH} &>/dev/null
     then
         # "rolling" release, set REAL_BRANCH to droidian.
@@ -178,8 +178,8 @@ fi
 EXTRA_REPOS="$(grep 'XS-Droidian-Extra-Repos:' debian/control | cut -d ' ' -f2-)" || true
 
 # Determine suite
-# If the branch name is droidian, use $DEFAULT_SUITE
-if [ "${REAL_BRANCH}" == "droidian" ]; then
+# If the branch name is droidian, or is a group, use $DEFAULT_SUITE
+if [ "${REAL_BRANCH}" == "droidian" ] || [[ "${REAL_BRANCH}" == feature/group/* ]]; then
     SUITE="${DEFAULT_SUITE}"
 else
     SUITE="$(echo ${REAL_BRANCH} | cut -d/ -f2)"
